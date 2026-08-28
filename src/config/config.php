@@ -7,8 +7,8 @@ define('DB_NAME', 'php_sast_demo');
 define('APP_SECRET', 'supersecret_api_key_2024');
 
 // Vulnerable: credenciales de nube embebidas en el codigo (para probar GitHub Secret Scanning)
-define('AWS_ACCESS_KEY_ID', 'AKIAIOSFODNN7EXAMPLE');
-define('AWS_SECRET_ACCESS_KEY', 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY');
+define('AWS_ACCESS_KEY_ID', 'AKIAT7QZ9XM2LK4RN8WJ');
+define('AWS_SECRET_ACCESS_KEY', 'aB3dE9fG2hJ4kL6mN8pQ1rS5tU7vW0xY3zA6bC9d');
 
 $conn = mysqli_connect(DB_HOST, DB_USER, DB_PASS, DB_NAME);
 
