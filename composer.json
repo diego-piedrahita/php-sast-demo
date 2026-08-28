@@ -20,6 +20,15 @@
     "config": {
         "allow-plugins": {
             "dealerdirect/phpcodesniffer-composer-installer": true
+        },
+        "policy": {
+            "advisories": {
+                "ignore-id": {
+                    "PKSA-35kn-2ddp-d3p4": "Version vulnerable sembrada a proposito para validar Dependabot/SCA en GitHub.",
+                    "PKSA-m8by-bb7v-7qt5": "Version vulnerable sembrada a proposito para validar Dependabot/SCA en GitHub.",
+                    "PKSA-8sw7-9x88-c8bx": "Version vulnerable sembrada a proposito para validar Dependabot/SCA en GitHub."
+                }
+            }
         }
     }
 }
