@@ -98,3 +98,29 @@ Se consultó la API `repos/{owner}/{repo}/code-scanning/alerts` y se confirmaron
 ## 8. Conclusión
 
 Queda demostrado que es posible ejecutar SAST para proyectos PHP directamente en GitHub, sin CodeQL ni SonarQube, integrando **Psalm** (taint analysis) y **phpcs-security-audit** (reglas de patrones inseguros) en un mismo workflow de GitHub Actions, publicando ambos resultados como SARIF en la pestaña nativa **Security → Code scanning alerts** del repositorio.
+
+## 9. Evaluación de brechas frente a un programa DevSecOps/AppSec completo
+
+La solución construida cubre **SAST**, pero un programa de AppSec en GitHub normalmente exige más capacidades. Estado verificado (vía `gh api repos/diego-piedrahita/php-sast-demo`) al momento de esta evaluación:
+
+| Capacidad | ¿Cubierta hoy? | Cómo lograrla en GitHub |
+|---|---|---|
+| SAST | ✅ Sí | Psalm (taint analysis) + phpcs-security-audit, SARIF en Code Scanning |
+| SCA (CVE + licencias en dependencias) | ❌ No — `vulnerability-alerts` estaba deshabilitado (`404 Vulnerability alerts are disabled`) | Habilitar **Dependabot alerts** + `security_and_analysis.dependabot_security_updates`, y `.github/dependabot.yml` para actualizaciones automáticas |
+| SBOM | ❌ No | Exportar SBOM SPDX vía endpoint nativo `GET /repos/{owner}/{repo}/dependency-graph/sbom`, automatizado en el workflow como artifact |
+| Secret scanning | ⚠️ Parcial | `secret_scanning.status = enabled` y `secret_scanning_push_protection.status = enabled` (por defecto en repos públicos), pero **0 alertas** detectadas: los patrones genéricos hardcodeados en `src/config/config.php` (`root`/`admin123`, `APP_SECRET`) no calzan con los patrones de partners que detecta el escaneo estándar, solo credenciales de proveedores conocidos (tokens de servicios). Para secretos genéricos se requeriría un motor adicional (p. ej. Gitleaks) o patrones custom (solo disponible con GHAS Enterprise) |
+| Calidad de código / deuda técnica | ❌ No | Añadir PHPMD (mantenibilidad/complejidad) o phpcpd (duplicación) como jobs adicionales del workflow |
+| Escaneo de IaC | ❌ No aplica aún | No hay archivos IaC en el repo; si se agregan (Bicep/Terraform/Dockerfile), usar Trivy o Checkov |
+| Integración CI/CD | ✅ Sí | GitHub Actions dispara en push/PR a `dev`, `qas`, `main` y `workflow_dispatch` |
+| Flujo de excepciones/aceptación de riesgo | ⚠️ Parcial | Code Scanning permite `dismiss` con razón (`false positive`, `won't fix`, `used in tests`), trazable vía API (`dismissed_by/at/reason`), pero sin aprobación dual ni gobierno formal |
+| Métricas ejecutivas / dashboards de portafolio | ❌ No | Requiere GHAS Enterprise (Security Overview) o un pipeline propio que consuma la API de Code Scanning/Dependabot/Secret Scanning |
+
+**Conclusión de la brecha:** el POC resuelve el problema puntual solicitado (SAST para PHP sin CodeQL/SonarQube). Para un programa AppSec completo restan, en orden de esfuerzo: (1) habilitar Dependabot alerts + `dependabot.yml` (bajo esfuerzo, nativo), (2) automatizar export de SBOM (bajo esfuerzo, nativo), (3) formalizar el flujo de excepciones y (4) evaluar GHAS Enterprise para métricas ejecutivas y detección de secretos genéricos.
+
+## 10. Implementación de extensiones (Dependabot, Secret Scanning, SBOM)
+
+A partir de la evaluación anterior, se implementaron las extensiones de menor esfuerzo directamente sobre el repositorio ya publicado:
+
+- **Dependabot alerts (SCA):** se habilitaron las alertas de vulnerabilidades (`vulnerability-alerts`) y las actualizaciones de seguridad automáticas (`dependabot_security_updates`) vía API, y se añadió `.github/dependabot.yml` con dos ecosistemas: `composer` (dependencias PHP) y `github-actions` (versiones de acciones usadas en los workflows), ambos con revisión semanal.
+- **Secret scanning:** se confirmó que ya estaba habilitado por defecto (repo público) junto con *push protection*; se documenta como limitación conocida que no cubre los secretos genéricos sembrados en `src/config/config.php` (solo detecta patrones de proveedores conocidos).
+- **SBOM:** se agregó un job al workflow (`sast.yml`) que consulta el endpoint nativo `GET /repos/{owner}/{repo}/dependency-graph/sbom` (formato SPDX) usando el token de GitHub Actions y publica el resultado como artifact descargable en cada ejecución.

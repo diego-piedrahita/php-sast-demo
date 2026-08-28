@@ -50,3 +50,21 @@ jobs:
         with:
           sarif_file: phpcs-results.sarif
           category: phpcs-security-audit
+
+  sbom:
+    name: Export SBOM (SPDX)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Export dependency graph SBOM
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api "repos/${{ github.repository }}/dependency-graph/sbom" > sbom.spdx.json
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-spdx
+          path: sbom.spdx.json
