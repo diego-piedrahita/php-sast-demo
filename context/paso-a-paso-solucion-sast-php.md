@@ -124,3 +124,39 @@ A partir de la evaluación anterior, se implementaron las extensiones de menor e
 - **Dependabot alerts (SCA):** se habilitaron las alertas de vulnerabilidades (`vulnerability-alerts`) y las actualizaciones de seguridad automáticas (`dependabot_security_updates`) vía API, y se añadió `.github/dependabot.yml` con dos ecosistemas: `composer` (dependencias PHP) y `github-actions` (versiones de acciones usadas en los workflows), ambos con revisión semanal.
 - **Secret scanning:** se confirmó que ya estaba habilitado por defecto (repo público) junto con *push protection*; se documenta como limitación conocida que no cubre los secretos genéricos sembrados en `src/config/config.php` (solo detecta patrones de proveedores conocidos).
 - **SBOM:** se agregó un job al workflow (`sast.yml`) que consulta el endpoint nativo `GET /repos/{owner}/{repo}/dependency-graph/sbom` (formato SPDX) usando el token de GitHub Actions y publica el resultado como artifact descargable en cada ejecución.
+
+## 11. Validación end-to-end: nuevas vulnerabilidades sembradas y detección en GitHub
+
+Para comprobar que cada herramienta habilitada detecta hallazgos reales, se sembraron vulnerabilidades adicionales y se corrió el pipeline completo:
+
+### SAST (Psalm + phpcs-security-audit)
+
+Se creó `src/products/export.php` con tres vulnerabilidades nuevas:
+
+| Vulnerabilidad | Código | Regla detectada por Psalm |
+|---|---|---|
+| Command Injection | `shell_exec()` con el parámetro `?file=` concatenado | `TaintedShell` |
+| Path Traversal / Local File Inclusion | `include` con el parámetro `?template=` concatenado | `TaintedInclude` |
+| Insecure Deserialization | `unserialize()` sobre la cookie `export_prefs` | `TaintedUnserialize` |
+
+Resultado: el total de alertas de Code Scanning pasó de 14 a **19** tras el push, confirmando la detección de las 3 nuevas reglas (más hallazgos correlacionados de phpcs-security-audit).
+
+### SCA / Dependabot
+
+Se agregó `phpmailer/phpmailer` en versión `6.0.7` (afectada por 3 avisos de seguridad públicos) a `composer.json`. Composer bloqueó la instalación por su política de auditoría (`policy.advisories.block`); se permitió explícitamente vía `config.policy.advisories.ignore-id` (con los IDs `PKSA-*` reportados) para que la versión vulnerable quedara fijada en el manifiesto sin romper el CI.
+
+Resultado: **3 alertas de Dependabot** (todas `high`, estado `open`) sobre `phpmailer/phpmailer`, visibles en `Security → Dependabot alerts` y también reportadas automáticamente en el output de `git push`.
+
+### Secret Scanning
+
+Se probaron tres secretos de prueba embebidos en `src/config/config.php`:
+
+| Secreto probado | Resultado |
+|---|---|
+| AWS Access Key + Secret Key (formato aleatorio válido) | Sin alerta ni bloqueo — no coincidió con el patrón exacto (posible validación de checksum interno de AWS) |
+| GitHub Personal Access Token (`ghp_` + 36 caracteres aleatorios) | Sin alerta ni bloqueo — probablemente GitHub valida sus propios tokens contra su servicio interno y descarta los que nunca fueron emitidos |
+| Slack Incoming Webhook URL (formato de prueba) | **Bloqueado en tiempo real por Push Protection** al hacer `git push` (commit rechazado con `GH013: Repository rule violations`) |
+
+Este último resultado es la validación más contundente: GitHub detectó el secreto en el mismo momento del `push` y rechazó el commit antes de que llegara al repositorio remoto, incluso con el ajuste `secret_scanning_push_protection` deshabilitado vía API — lo que indica que existe una protección base no configurable para los patrones de mayor confianza en repositorios públicos. El commit bloqueado nunca llegó a `origin/main`; se revirtió localmente y no se intentó eludir la protección (la única vía de bypass documentada por GitHub requiere una decisión humana explícita en el navegador).
+
+**Conclusión:** las cuatro superficies de seguridad quedaron validadas end-to-end en GitHub nativo: **SAST** (19 alertas), **SCA/Dependabot** (3 alertas), **SBOM** (artifact generado en cada run) y **Secret Scanning/Push Protection** (bloqueo real de un secreto en tránsito).
