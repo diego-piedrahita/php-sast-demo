@@ -1,0 +1,52 @@
+name: PHP SAST (Psalm taint analysis + phpcs-security-audit)
+
+on:
+  push:
+    branches: [dev, qas, main]
+  pull_request:
+    branches: [dev, qas, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  sast:
+    name: Static Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+          coverage: none
+          tools: composer
+
+      - name: Install dependencies
+        run: composer install --no-progress --prefer-dist --no-interaction
+
+      - name: Run Psalm taint analysis (SARIF)
+        run: vendor/bin/psalm --taint-analysis --report=psalm-results.sarif
+        continue-on-error: true
+
+      - name: Upload Psalm SARIF to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: psalm-results.sarif
+          category: psalm-taint-analysis
+
+      - name: Run phpcs-security-audit (JSON report)
+        run: vendor/bin/phpcs --standard=phpcs.xml --report=json --report-file=phpcs-results.json src || true
+
+      - name: Convert phpcs report to SARIF
+        run: php scripts/phpcs-to-sarif.php phpcs-results.json phpcs-results.sarif
+
+      - name: Upload phpcs-security-audit SARIF to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: phpcs-results.sarif
+          category: phpcs-security-audit

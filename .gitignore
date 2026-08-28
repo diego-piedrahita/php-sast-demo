@@ -1,0 +1,8 @@
+/vendor/
+/node_modules/
+*.sarif
+phpcs-results.json
+psalm-results.sarif
+.phpunit.result.cache
+.DS_Store
+Thumbs.db

@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<ruleset name="PHP-SAST-Demo-Security">
+    <description>Reglas de seguridad (phpcs-security-audit) para el analisis estatico del proyecto demo</description>
+    <file>src</file>
+    <arg name="extensions" value="php"/>
+    <arg value="p"/>
+    <rule ref="Security"/>
+</ruleset>
