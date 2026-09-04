@@ -34,7 +34,7 @@ jobs:
         continue-on-error: true
 
       - name: Upload Psalm SARIF to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: psalm-results.sarif
           category: psalm-taint-analysis
@@ -46,7 +46,7 @@ jobs:
         run: php scripts/phpcs-to-sarif.php phpcs-results.json phpcs-results.sarif
 
       - name: Upload phpcs-security-audit SARIF to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: phpcs-results.sarif
           category: phpcs-security-audit
